@@ -1,0 +1,36 @@
+# Start from a Ray ML base image (includes Python, CUDA, Ray)
+# Check Ray documentation for recommended base images compatible with your KubeRay operator
+# e.g., rayproject/ray-ml:2.9.3-gpu (ensure CUDA version matches your GKE GPU drivers)
+# For Llama 3.1, PyTorch 2.1+ and CUDA 11.8 or 12.1+ are common.
+# The g2-standard nodes with 'latest' driver usually get CUDA 12.x.
+FROM rayproject/ray-ml:2.20.0-py310-cu121
+
+# Set environment variable to ensure Python outputs are sent straight to terminal
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies if needed
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+USER ray
+
+# Install Python libraries
+# Pin versions for reproducibility
+RUN pip install \
+    "torch==2.1.2" \
+    "torchvision==0.16.2" \
+    "torchaudio==2.1.2" \
+    "transformers==4.40.1" \
+    "datasets==2.17.0" \
+    "peft==0.10.0" \
+    "accelerate==0.29.3" \
+    "bitsandbytes==0.43.0" \
+    "trl==0.8.6" \
+    "scipy" \
+    "wandb" # Optional, for experiment tracking
+
+# (Optional) For Flash Attention 2 (if your GPU and CUDA version support it)
+# RUN pip install flash-attn --no-build-isolation
+
+WORKDIR /home/ray/app

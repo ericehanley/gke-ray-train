@@ -1,0 +1,88 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: llama-raycluster
+  # namespace: default # Or your preferred namespace
+spec:
+  rayVersion: '2.20.0' # Should match the Ray version in your Docker image
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: '0.0.0.0'
+      num-cpus: '0' # Recommended for head node not to take workloads
+    template:
+      spec:
+        containers:
+          - name: ray-head
+            image: YOUR_IMAGE_NAME_HERE # e.g., us-central1-docker.pkg.dev/your-project/docker-repo/ray-llama-finetune:latest
+            ports:
+              - containerPort: 6379 # Ray GCS server
+                name: gcs-server
+              - containerPort: 8265 # Ray Dashboard
+                name: dashboard
+              - containerPort: 10001 # Ray client
+                name: client
+            resources:
+              limits:
+                cpu: "2"
+                memory: "8Gi"
+              requests:
+                cpu: "1"
+                memory: "4Gi"
+            env:
+              - name: HF_HOME # Set Hugging Face cache directory to a persistent volume if needed
+                value: "/mnt/hf_cache" # Example, requires PVC setup
+            # If you need to mount a Hugging Face token secret:
+            # volumeMounts:
+            # - name: hf-token-volume
+            #   mountPath: "/etc/hf-token"
+            #   readOnly: true
+        # volumes:
+        #   - name: hf-token-volume
+        #     secret:
+        #       secretName: hf-secret # You'll need to create this secret
+  workerGroupSpecs:
+  - replicas: 2        # Start with 2 workers
+    minReplicas: 1     # Minimum workers for autoscaling
+    maxReplicas: 4     # Maximum workers for autoscaling
+    groupName: gpu-workers
+    rayStartParams: {}
+    template:
+      spec:
+        # Ensure workers are scheduled on GPU nodes
+        nodeSelector:
+          cloud.google.com/gke-accelerator: nvidia-l4 # Or nvidia-tesla-a100 etc.
+        tolerations: # If using taints on GPU nodes
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        containers:
+        - name: ray-worker
+          image: YOUR_IMAGE_NAME_HERE # e.g., us-central1-docker.pkg.dev/your-project/docker-repo/ray-llama-finetune:latest
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh","-c","ray stop"]
+          resources:
+            limits:
+              cpu: "8" # Adjust based on g2-standard-12 (12 vCPU) or your chosen machine type
+              memory: "40Gi" # Adjust based on machine type
+              nvidia.com/gpu: "1" # Request 1 GPU
+            requests:
+              cpu: "4"
+              memory: "20Gi"
+              nvidia.com/gpu: "1"
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            - name: HF_HOME
+              value: "/mnt/hf_cache" # Example
+          # volumeMounts:
+          # - name: hf-token-volume
+          #   mountPath: "/etc/hf-token"
+          #   readOnly: true
+        # volumes: # Define if using secrets or PVCs
+        #   - name: hf-token-volume
+        #     secret:
+        #       secretName: hf-secret
