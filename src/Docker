@@ -3,7 +3,7 @@
 # e.g., rayproject/ray-ml:2.9.3-gpu (ensure CUDA version matches your GKE GPU drivers)
 # For Llama 3.1, PyTorch 2.1+ and CUDA 11.8 or 12.1+ are common.
 # The g2-standard nodes with 'latest' driver usually get CUDA 12.x.
-FROM rayproject/ray-ml:2.20.0-py310-cu121
+FROM rayproject/ray-ml:2.46.0.0e19ea-py310-gpu
 
 # Set environment variable to ensure Python outputs are sent straight to terminal
 ENV PYTHONUNBUFFERED=1

@@ -1,25 +1,24 @@
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
-  name: llama-raycluster
-  # namespace: default # Or your preferred namespace
+  name: llama-raycluster-ephemeral # Changed name slightly to reflect ephemeral nature
 spec:
-  rayVersion: '2.20.0' # Should match the Ray version in your Docker image
+  rayVersion: '2.46.0'
   headGroupSpec:
     rayStartParams:
       dashboard-host: '0.0.0.0'
-      num-cpus: '0' # Recommended for head node not to take workloads
+      num-cpus: '0'
     template:
       spec:
         containers:
           - name: ray-head
-            image: YOUR_IMAGE_NAME_HERE # e.g., us-central1-docker.pkg.dev/your-project/docker-repo/ray-llama-finetune:latest
+            image: rayproject/ray-ml:2.46.0.0e19ea-py310
             ports:
-              - containerPort: 6379 # Ray GCS server
+              - containerPort: 6379
                 name: gcs-server
-              - containerPort: 8265 # Ray Dashboard
+              - containerPort: 8265
                 name: dashboard
-              - containerPort: 10001 # Ray client
+              - containerPort: 10001
                 name: client
             resources:
               limits:
@@ -29,47 +28,53 @@ spec:
                 cpu: "1"
                 memory: "4Gi"
             env:
-              - name: HF_HOME # Set Hugging Face cache directory to a persistent volume if needed
-                value: "/mnt/hf_cache" # Example, requires PVC setup
-            # If you need to mount a Hugging Face token secret:
-            # volumeMounts:
-            # - name: hf-token-volume
-            #   mountPath: "/etc/hf-token"
-            #   readOnly: true
-        # volumes:
-        #   - name: hf-token-volume
-        #     secret:
-        #       secretName: hf-secret # You'll need to create this secret
+              - name: HF_HOME
+                value: "/mnt/hf_cache"
+              - name: TF_CPP_MIN_LOG_LEVEL
+                value: "2"
+            volumeMounts:
+            - name: hf-token-volume
+              mountPath: "/etc/hf-token"
+              readOnly: true
+            - name: hf-cache-storage
+              mountPath: "/mnt/hf_cache"
+            - name: output-storage
+              mountPath: "/mnt/pvc"
+        volumes:
+          - name: hf-token-volume
+            secret:
+              secretName: hf-secret
+          - name: hf-cache-storage
+            emptyDir: {}
+          - name: output-storage
+            emptyDir: {}
   workerGroupSpecs:
-  - replicas: 2        # Start with 2 workers
-    minReplicas: 1     # Minimum workers for autoscaling
-    maxReplicas: 4     # Maximum workers for autoscaling
+  - replicas: 8
     groupName: gpu-workers
     rayStartParams: {}
     template:
       spec:
-        # Ensure workers are scheduled on GPU nodes
         nodeSelector:
-          cloud.google.com/gke-accelerator: nvidia-l4 # Or nvidia-tesla-a100 etc.
-        tolerations: # If using taints on GPU nodes
+          cloud.google.com/gke-accelerator: nvidia-h100-mega-80gb
+        tolerations:
         - key: "nvidia.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
         containers:
         - name: ray-worker
-          image: YOUR_IMAGE_NAME_HERE # e.g., us-central1-docker.pkg.dev/your-project/docker-repo/ray-llama-finetune:latest
+          image: rayproject/ray-ml:2.46.0.0e19ea-py310
           lifecycle:
             preStop:
               exec:
                 command: ["/bin/sh","-c","ray stop"]
           resources:
             limits:
-              cpu: "8" # Adjust based on g2-standard-12 (12 vCPU) or your chosen machine type
-              memory: "40Gi" # Adjust based on machine type
-              nvidia.com/gpu: "1" # Request 1 GPU
+              cpu: "20"
+              memory: "50Gi"
+              nvidia.com/gpu: "1"
             requests:
-              cpu: "4"
-              memory: "20Gi"
+              cpu: "16"
+              memory: "40Gi"
               nvidia.com/gpu: "1"
           env:
             - name: NVIDIA_VISIBLE_DEVICES
@@ -77,12 +82,22 @@ spec:
             - name: NVIDIA_DRIVER_CAPABILITIES
               value: "compute,utility"
             - name: HF_HOME
-              value: "/mnt/hf_cache" # Example
-          # volumeMounts:
-          # - name: hf-token-volume
-          #   mountPath: "/etc/hf-token"
-          #   readOnly: true
-        # volumes: # Define if using secrets or PVCs
-        #   - name: hf-token-volume
-        #     secret:
-        #       secretName: hf-secret
+              value: "/mnt/hf_cache"
+            - name: TF_CPP_MIN_LOG_LEVEL
+              value: "2"
+          volumeMounts:
+          - name: hf-token-volume
+            mountPath: "/etc/hf-token"
+            readOnly: true
+          - name: hf-cache-storage
+            mountPath: "/mnt/hf_cache"
+          - name: output-storage
+            mountPath: "/mnt/pvc"
+        volumes:
+          - name: hf-token-volume
+            secret:
+              secretName: hf-secret
+          - name: hf-cache-storage
+            emptyDir: {}
+          - name: output-storage
+            emptyDir: {}
