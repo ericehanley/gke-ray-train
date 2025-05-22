@@ -5,7 +5,8 @@ gcloud container clusters create ${CLUSTER_NAME} \
     --machine-type=n2-standard-8 \
     --enable-ray-cluster-logging \
     --enable-ray-cluster-monitoring \
-    --addons=RayOperator
+    --workload-pool=${PROJECT_ID}.svc.id.goog \
+    --addons=RayOperator,GcsFuseCsiDriver
 
 gcloud container node-pools create a3megax2nodes \
     --accelerator type=nvidia-h100-mega-80gb,count=8,gpu-driver-version=latest \
@@ -21,14 +22,25 @@ source myenv/bin/activate
 
 pip install -U "ray[data,train,tune,serve]"
 
+# Create Cloud Storage Bucket & Configure
+gcloud storage buckets create gs://${GSBUCKET} \
+    --uniform-bucket-level-access \
+    --location=${REGION}\
+    --enable-hierarchical-namespace
+
+# Create GKE SA
+kubectl create serviceaccount ${KSA_NAME}
+
+# Add permissions to bucket for FUSE CSI driver
+gcloud storage buckets add-iam-policy-binding gs://${GSBUCKET} \
+  --member "principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/${NAMESPACE}/sa/${KSA_NAME}" \
+  --role "roles/storage.objectUser"
+
 # Deploy RayCluster
 kubectl create secret generic hf-secret --from-literal=HF_TOKEN=${HF_TOKEN}
-kubectl apply -f ray-cluster-llama.yaml
 
-# Check the status:
-kubectl get rayclusters
-kubectl get pods -l ray.io/cluster=llama-raycluster
-# Wait until head and worker pods are in 'Running' state.
+# UPDATE ray-cluster-llama.yaml with SA and Bucket values
+kubectl apply -f ray-cluster-config.yaml
 
 # Submit finetune job.
 # Get the head pod name
@@ -42,16 +54,16 @@ kubectl port-forward $HEAD_POD 8265:8265
 ray job submit --address http://localhost:8265 --runtime-env-json='{
     "working_dir": ".",
     "pip": [
-        "wandb",
-        "peft",
-        "accelerate",
-        "torch",
-        "transformers",
-        "datasets",
-        "trl",
-        "bitsandbytes"
+        "torch==2.3.0",
+        "datasets==3.6.0",
+        "transformers==4.50.0",
+        "peft==0.15.0",
+        "accelerate==1.6.0",
+        "trl==0.17.0",
+        "bitsandbytes==0.45.0"
     ],
     "env_vars": {
-        "TF_CPP_MIN_LOG_LEVEL": "2"
+        "TF_CPP_MIN_LOG_LEVEL": "2",
+        "HF_TOKEN": "'"$HF_TOKEN"'"
     }
 }' -- python src/fine_tune_llama_ray.py

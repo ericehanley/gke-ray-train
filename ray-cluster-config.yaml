@@ -1,7 +1,8 @@
+# TODO: Setup Google Cloud connection for outputs/checkpoints/etc. instead of empty directories.
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
-  name: llama-raycluster-ephemeral # Changed name slightly to reflect ephemeral nature
+  name: llama-raycluster
 spec:
   rayVersion: '2.46.0'
   headGroupSpec:
@@ -9,7 +10,14 @@ spec:
       dashboard-host: '0.0.0.0'
       num-cpus: '0'
     template:
+      metadata:
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
       spec:
+        serviceAccountName: eh-ray
         containers:
           - name: ray-head
             image: rayproject/ray-ml:2.46.0.0e19ea-py310
@@ -47,13 +55,25 @@ spec:
           - name: hf-cache-storage
             emptyDir: {}
           - name: output-storage
-            emptyDir: {}
+            csi:
+              driver: gcsfuse.csi.storage.gke.io
+              volumeAttributes:
+                bucketName: eh-ray
+                mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
+
   workerGroupSpecs:
-  - replicas: 8
+  - replicas: 16
     groupName: gpu-workers
     rayStartParams: {}
     template:
+      metadata:
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
       spec:
+        serviceAccountName: eh-ray
         nodeSelector:
           cloud.google.com/gke-accelerator: nvidia-h100-mega-80gb
         tolerations:
@@ -100,4 +120,8 @@ spec:
           - name: hf-cache-storage
             emptyDir: {}
           - name: output-storage
-            emptyDir: {}
+            csi:
+              driver: gcsfuse.csi.storage.gke.io
+              volumeAttributes:
+                bucketName: eh-ray
+                mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
