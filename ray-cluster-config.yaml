@@ -1,4 +1,3 @@
-# TODO: Setup Google Cloud connection for outputs/checkpoints/etc. instead of empty directories.
 apiVersion: ray.io/v1
 kind: RayCluster
 metadata:
@@ -8,7 +7,7 @@ spec:
   headGroupSpec:
     rayStartParams:
       dashboard-host: '0.0.0.0'
-      num-cpus: '0'
+      num-cpus: '0' # Head node does not schedule tasks by default
     template:
       metadata:
         annotations:
@@ -16,6 +15,11 @@ spec:
           gke-gcsfuse/cpu-limit: "0"
           gke-gcsfuse/memory-limit: "0"
           gke-gcsfuse/ephemeral-storage-limit: "0"
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            [
+              {"interfaceName":"eth0","network":"default"}
+            ]
       spec:
         serviceAccountName: eh-ray
         containers:
@@ -30,11 +34,11 @@ spec:
                 name: client
             resources:
               limits:
-                cpu: "2"
-                memory: "8Gi"
+                cpu: "4" # Adjusted for head node
+                memory: "16Gi" # Adjusted for head node
               requests:
-                cpu: "1"
-                memory: "4Gi"
+                cpu: "2" # Adjusted for head node
+                memory: "8Gi" # Adjusted for head node
             env:
               - name: HF_HOME
                 value: "/mnt/hf_cache"
@@ -62,9 +66,9 @@ spec:
                 mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
 
   workerGroupSpecs:
-  - replicas: 16
+  - replicas: 2 # One worker pod per node, for your 2-node cluster
     groupName: gpu-workers
-    rayStartParams: {}
+    rayStartParams: {} # Ray will auto-detect all GPUs in the pod
     template:
       metadata:
         annotations:
@@ -72,6 +76,31 @@ spec:
           gke-gcsfuse/cpu-limit: "0"
           gke-gcsfuse/memory-limit: "0"
           gke-gcsfuse/ephemeral-storage-limit: "0"
+          networking.gke.io/default-interface: 'eth0'
+          networking.gke.io/interfaces: |
+            [
+              {"interfaceName":"eth0","network":"default"},
+              {"interfaceName":"eth1","network":"vpc1"},
+              {"interfaceName":"eth2","network":"vpc2"},
+              {"interfaceName":"eth3","network":"vpc3"},
+              {"interfaceName":"eth4","network":"vpc4"},
+              {"interfaceName":"eth5","network":"vpc5"},
+              {"interfaceName":"eth6","network":"vpc6"},
+              {"interfaceName":"eth7","network":"vpc7"},
+              {"interfaceName":"eth8","network":"vpc8"}
+            ]
+          devices.gke.io/container.tcpxo-daemon: |+
+            - path: /dev/nvidia0
+            - path: /dev/nvidia1
+            - path: /dev/nvidia2
+            - path: /dev/nvidia3
+            - path: /dev/nvidia4
+            - path: /dev/nvidia5
+            - path: /dev/nvidia6
+            - path: /dev/nvidia7
+            - path: /dev/nvidiactl
+            - path: /dev/nvidia-uvm
+            - path: /dev/dmabuf_import_helper
       spec:
         serviceAccountName: eh-ray
         nodeSelector:
@@ -80,39 +109,121 @@ spec:
         - key: "nvidia.com/gpu"
           operator: "Exists"
           effect: "NoSchedule"
+        # GKE automatically adds tolerations for networking.gke.io.networks/*
         containers:
-        - name: ray-worker
-          image: rayproject/ray-ml:2.46.0.0e19ea-py310
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh","-c","ray stop"]
-          resources:
-            limits:
-              cpu: "20"
-              memory: "50Gi"
-              nvidia.com/gpu: "1"
-            requests:
-              cpu: "16"
-              memory: "40Gi"
-              nvidia.com/gpu: "1"
-          env:
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: all
-            - name: NVIDIA_DRIVER_CAPABILITIES
-              value: "compute,utility"
-            - name: HF_HOME
-              value: "/mnt/hf_cache"
-            - name: TF_CPP_MIN_LOG_LEVEL
-              value: "2"
-          volumeMounts:
-          - name: hf-token-volume
-            mountPath: "/etc/hf-token"
-            readOnly: true
-          - name: hf-cache-storage
-            mountPath: "/mnt/hf_cache"
-          - name: output-storage
-            mountPath: "/mnt/pvc"
+          - name: ray-worker
+            image: rayproject/ray-ml:2.46.0.0e19ea-py310
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh","-c","ray stop"]
+            resources: # Each worker pod gets all resources of one node
+              limits:
+                cpu: "96" # Adjust based on available cores on a3-megagpu-8g, leaving some for system
+                memory: "800Gi" # Adjust based on available RAM on a3-megagpu-8g
+                nvidia.com/gpu: "8" # All 8 GPUs on the node
+                # GKE multi-networking CNI will manage requests for these based on annotations
+                networking.gke.io.networks/vpc1: "1"
+                networking.gke.io.networks/vpc1.IP: "1"
+                networking.gke.io.networks/vpc2: "1"
+                networking.gke.io.networks/vpc2.IP: "1"
+                networking.gke.io.networks/vpc3: "1"
+                networking.gke.io.networks/vpc3.IP: "1"
+                networking.gke.io.networks/vpc4: "1"
+                networking.gke.io.networks/vpc4.IP: "1"
+                networking.gke.io.networks/vpc5: "1"
+                networking.gke.io.networks/vpc5.IP: "1"
+                networking.gke.io.networks/vpc6: "1"
+                networking.gke.io.networks/vpc6.IP: "1"
+                networking.gke.io.networks/vpc7: "1"
+                networking.gke.io.networks/vpc7.IP: "1"
+                networking.gke.io.networks/vpc8: "1"
+                networking.gke.io.networks/vpc8.IP: "1"
+              requests:
+                cpu: "80" # Adjust
+                memory: "700Gi" # Adjust
+                nvidia.com/gpu: "8"
+                networking.gke.io.networks/vpc1: "1"
+                networking.gke.io.networks/vpc1.IP: "1"
+                networking.gke.io.networks/vpc2: "1"
+                networking.gke.io.networks/vpc2.IP: "1"
+                networking.gke.io.networks/vpc3: "1"
+                networking.gke.io.networks/vpc3.IP: "1"
+                networking.gke.io.networks/vpc4: "1"
+                networking.gke.io.networks/vpc4.IP: "1"
+                networking.gke.io.networks/vpc5: "1"
+                networking.gke.io.networks/vpc5.IP: "1"
+                networking.gke.io.networks/vpc6: "1"
+                networking.gke.io.networks/vpc6.IP: "1"
+                networking.gke.io.networks/vpc7: "1"
+                networking.gke.io.networks/vpc7.IP: "1"
+                networking.gke.io.networks/vpc8: "1"
+                networking.gke.io.networks/vpc8.IP: "1"
+            securityContext:
+              privileged: true
+            env:
+              - name: NVIDIA_VISIBLE_DEVICES
+                value: "all"
+              - name: NVIDIA_DRIVER_CAPABILITIES
+                value: "compute,utility"
+              - name: HF_HOME
+                value: "/mnt/hf_cache"
+              - name: TF_CPP_MIN_LOG_LEVEL
+                value: "2"
+
+              # Crucial: Ray-compatible LD_LIBRARY_PATH
+              - name: LD_LIBRARY_PATH
+                value: /usr/local/nvidia/lib64:/usr/local/lib:${LD_LIBRARY_PATH}
+
+              # NCCL Settings exactly as per your friend's manifest
+              - name: NCCL_DEBUG
+                value: "INFO" # Friend used "ERROR", but let's keep "INFO" for now
+              - name: NCCL_DEBUG_SUBSYS
+                value: "INIT,NET,ENV,COLL,GRAPH" # As per friend
+              - name: NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+                value: "/dev/aperture_devices" # As per friend
+            volumeMounts:
+            - name: hf-token-volume
+              mountPath: "/etc/hf-token"
+              readOnly: true
+            - name: hf-cache-storage
+              mountPath: "/mnt/hf_cache"
+            - name: output-storage
+              mountPath: "/mnt/pvc"
+            - name: nvidia-install-dir-host
+              mountPath: /usr/local/nvidia # For NCCL libs, tuner configs etc.
+            - name: shared-memory
+              mountPath: /dev/shm
+            - name: aperture-devices # For NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY
+              mountPath: /dev/aperture_devices
+            - name: sys
+              mountPath: /sys
+
+          - name: tcpxo-daemon
+            image: us-docker.pkg.dev/gce-ai-infra/gpudirect-tcpxo/tcpgpudmarxd-dev@sha256:b4adc42825a9626a75ace1f96b8eb0ec726db7d0f5d1e2c69d952200bb679f51 # Pinned digest
+            imagePullPolicy: IfNotPresent # Since it's a digest, IfNotPresent is fine
+            command: ["/bin/sh", "-c"]
+            args:
+              - |
+                set -ex
+                chmod 755 /fts/entrypoint_rxdm_container.sh
+                /fts/entrypoint_rxdm_container.sh --num_hops=2 --num_nics=8 --uid=$(POD_NAME) --alsologtostderr
+            securityContext:
+              privileged: true
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: LD_LIBRARY_PATH
+                value: /usr/local/nvidia/lib64
+            volumeMounts:
+              - name: nvidia-install-dir-host
+                mountPath: /usr/local/nvidia
+              - name: sys
+                mountPath: /hostsysfs
+              - name: proc-sys
+                mountPath: /hostprocsysfs
         volumes:
           - name: hf-token-volume
             secret:
@@ -125,3 +236,23 @@ spec:
               volumeAttributes:
                 bucketName: eh-ray
                 mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
+          - name: nvidia-install-dir-host
+            hostPath:
+              path: /home/kubernetes/bin/nvidia # Ensure this path contains NCCL tuner configs if referenced
+              type: DirectoryOrCreate
+          - name: sys
+            hostPath:
+              path: /sys
+              type: Directory
+          - name: proc-sys
+            hostPath:
+              path: /proc/sys
+              type: Directory
+          - name: shared-memory
+            emptyDir:
+              medium: "Memory"
+              sizeLimit: "2Gi" # Can be larger if needed for 8-GPU tasks
+          - name: aperture-devices
+            hostPath:
+              path: /dev/aperture_devices
+              type: DirectoryOrCreate

@@ -1,0 +1,174 @@
+# Copyright 2025 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc1
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc1
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc2
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc2
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc3
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc3
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc4
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc4
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc5
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc5
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc6
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc6
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc7
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc7
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: Network
+metadata:
+  name: vpc8
+spec:
+  parametersRef:
+    group: networking.gke.io
+    kind: GKENetworkParamSet
+    name: vpc8
+  type: Device
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc1
+spec:
+  vpc: eh-mega-cluster-net-1
+  vpcSubnet: eh-mega-cluster-sub-1
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc2
+spec:
+  vpc: eh-mega-cluster-net-2
+  vpcSubnet: eh-mega-cluster-sub-2
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc3
+spec:
+  vpc: eh-mega-cluster-net-3
+  vpcSubnet: eh-mega-cluster-sub-3
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc4
+spec:
+  vpc: eh-mega-cluster-net-4
+  vpcSubnet: eh-mega-cluster-sub-4
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc5
+spec:
+  vpc: eh-mega-cluster-net-5
+  vpcSubnet: eh-mega-cluster-sub-5
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc6
+spec:
+  vpc: eh-mega-cluster-net-6
+  vpcSubnet: eh-mega-cluster-sub-6
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc7
+spec:
+  vpc: eh-mega-cluster-net-7
+  vpcSubnet: eh-mega-cluster-sub-7
+  deviceMode: NetDevice
+---
+apiVersion: networking.gke.io/v1
+kind: GKENetworkParamSet
+metadata:
+  name: vpc8
+spec:
+  vpc: eh-mega-cluster-net-8
+  vpcSubnet: eh-mega-cluster-sub-8
+  deviceMode: NetDevice

@@ -33,7 +33,7 @@ BNB_4BIT_QUANT_TYPE = "nf4"
 USE_NESTED_QUANT = False
 
 # Training parameters (will be passed to SFTConfig)
-NUM_TRAIN_EPOCHS = 5
+NUM_TRAIN_EPOCHS = 1
 PER_DEVICE_TRAIN_BATCH_SIZE = 2
 GRADIENT_ACCUMULATION_STEPS = 4
 
@@ -346,8 +346,8 @@ def train_loop_per_worker(config):
     
     # Shuffle and select subsets (adjust as needed)
     # For a real run, you might use more or all of the data.
-    # train_dataset = train_dataset.shuffle(seed=42).select(range(min(1000, len(train_dataset))))
-    # eval_dataset = eval_dataset.shuffle(seed=42).select(range(min(200, len(eval_dataset)))) # Using a smaller subset for faster eval
+    train_dataset = train_dataset.shuffle(seed=42).select(range(min(1000, len(train_dataset))))
+    eval_dataset = eval_dataset.shuffle(seed=42).select(range(min(200, len(eval_dataset)))) # Using a smaller subset for faster eval
 
     # 3. Set up SFTConfig
     sft_output_dir = os.path.join(OUTPUT_DIR_BASE, "sft_model_output_sql_gretel")
