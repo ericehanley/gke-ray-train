@@ -1,0 +1,127 @@
+# TODO: Setup Google Cloud connection for outputs/checkpoints/etc. instead of empty directories.
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: llama-raycluster
+spec:
+  rayVersion: '2.46.0'
+  headGroupSpec:
+    rayStartParams:
+      dashboard-host: '0.0.0.0'
+      num-cpus: '0'
+    template:
+      metadata:
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+      spec:
+        serviceAccountName: eh-ray
+        containers:
+          - name: ray-head
+            image: rayproject/ray-ml:2.46.0.0e19ea-py310
+            ports:
+              - containerPort: 6379
+                name: gcs-server
+              - containerPort: 8265
+                name: dashboard
+              - containerPort: 10001
+                name: client
+            resources:
+              limits:
+                cpu: "2"
+                memory: "8Gi"
+              requests:
+                cpu: "1"
+                memory: "4Gi"
+            env:
+              - name: HF_HOME
+                value: "/mnt/hf_cache"
+              - name: TF_CPP_MIN_LOG_LEVEL
+                value: "2"
+            volumeMounts:
+            - name: hf-token-volume
+              mountPath: "/etc/hf-token"
+              readOnly: true
+            - name: hf-cache-storage
+              mountPath: "/mnt/hf_cache"
+            - name: output-storage
+              mountPath: "/mnt/pvc"
+        volumes:
+          - name: hf-token-volume
+            secret:
+              secretName: hf-secret
+          - name: hf-cache-storage
+            emptyDir: {}
+          - name: output-storage
+            csi:
+              driver: gcsfuse.csi.storage.gke.io
+              volumeAttributes:
+                bucketName: eh-ray
+                mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
+
+  workerGroupSpecs:
+  - replicas: 2
+    groupName: gpu-workers
+    rayStartParams: {}
+    template:
+      metadata:
+        annotations:
+          gke-gcsfuse/volumes: "true"
+          gke-gcsfuse/cpu-limit: "0"
+          gke-gcsfuse/memory-limit: "0"
+          gke-gcsfuse/ephemeral-storage-limit: "0"
+      spec:
+        serviceAccountName: eh-ray
+        nodeSelector:
+          cloud.google.com/gke-accelerator: nvidia-h100-mega-80gb
+        tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+        containers:
+        - name: ray-worker
+          image: rayproject/ray-ml:2.46.0.0e19ea-py310
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh","-c","ray stop"]
+          resources:
+            limits:
+              cpu: "200"
+              memory: "1870Gi"
+              nvidia.com/gpu: "8"
+            requests:
+              cpu: "180"
+              memory: "1000Gi"
+              nvidia.com/gpu: "8"
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,utility"
+            - name: HF_HOME
+              value: "/mnt/hf_cache"
+            - name: TF_CPP_MIN_LOG_LEVEL
+              value: "2"
+          volumeMounts:
+          - name: hf-token-volume
+            mountPath: "/etc/hf-token"
+            readOnly: true
+          - name: hf-cache-storage
+            mountPath: "/mnt/hf_cache"
+          - name: output-storage
+            mountPath: "/mnt/pvc"
+        volumes:
+          - name: hf-token-volume
+            secret:
+              secretName: hf-secret
+          - name: hf-cache-storage
+            emptyDir: {}
+          - name: output-storage
+            csi:
+              driver: gcsfuse.csi.storage.gke.io
+              volumeAttributes:
+                bucketName: eh-ray
+                mountOptions: "uid=1000,gid=1000,file-mode=0775,dir-mode=0775,implicit-dirs"
