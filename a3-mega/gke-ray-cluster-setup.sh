@@ -67,7 +67,7 @@ echo "Head pod: $HEAD_POD"
 # Port-forward (keep this running in a separate terminal)
 kubectl port-forward $HEAD_POD 8265:8265
 
-# From separate terminal in same directory as your script
+# Fine tuning job
 ray job submit --address http://localhost:8265 --runtime-env-json='{
     "working_dir": ".",
     "pip": [
@@ -85,3 +85,7 @@ ray job submit --address http://localhost:8265 --runtime-env-json='{
         "NUM_GPUS_PER_NODE": "'"$NUM_GPUS_PER_NODE"'"
     }
 }' -- python ray-jobs/fine_tune_llama_ray.py
+
+# Scratch job.
+ray job submit --address http://localhost:8265 --runtime-env-json='{"working_dir": "."}' -- python ray-jobs/prepare_wikitext2_ray_job.py
+ray job submit --address http://localhost:8265 --runtime-env-json='{"working_dir": "."}' -- python ray-jobs/pytorch_llm_ray.py

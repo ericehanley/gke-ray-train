@@ -5,6 +5,8 @@ import ray
 from ray import train
 from ray.train import ScalingConfig
 from ray.train.torch import TorchTrainer
+from ray.train.huggingface.transformers import RayTrainReportCallback, prepare_trainer
+
 
 import torch
 
@@ -194,10 +196,6 @@ def run_inference_comparison(
 
 # --- Ray Train Training Function ---
 def train_loop_per_worker(config: dict):
-
-    """
-    A little more on SFTTrainer - which is a child class of HF Transformers Trainer class.
-    """
 
     # Discover the world
     rank = train.get_context().get_world_rank()
@@ -428,7 +426,7 @@ if __name__ == "__main__":
 
     # Load config.json
     try:
-        with open("ray-jobs/config.json", 'r') as f:
+        with open("ray-jobs/fine_tune_config.json", 'r') as f:
             loop_config = json.load(f)
     except FileNotFoundError:
         print("ERROR: config.json not found. Please create it.")
